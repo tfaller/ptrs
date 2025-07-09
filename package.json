@@ -8,14 +8,24 @@
     "pointer"
   ],
   "type": "module",
+  "exports": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "files": [
+    "dist"
+  ],
   "scripts": {
-    "test": "jest --watch"
+    "test": "jest --watch",
+    "build": "tsup"
   },
   "author": "Thomas Faller",
   "license": "MIT",
-  "dependencies": {
-    "@types/react": "^19.1.8",
-    "react": "^19.1.0"
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/tfaller/ptrs.git"
+  },
+  "peerDependencies": {
+    "@types/react": ">=18.0.0",
+    "react": ">=18.0.0"
   },
   "devDependencies": {
     "@testing-library/dom": "^10.4.0",
@@ -25,6 +35,7 @@
     "jest": "^30.0.4",
     "jest-environment-jsdom": "^30.0.4",
     "ts-jest": "^29.4.0",
-    "ts-node": "^10.9.2"
+    "ts-node": "^10.9.2",
+    "tsup": "^8.5.0"
   }
 }
