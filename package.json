@@ -1,0 +1,30 @@
+{
+  "name": "ptrs",
+  "version": "0.0.1",
+  "description": "Manage your state with pointers.",
+  "keywords": [
+    "react",
+    "state",
+    "pointer"
+  ],
+  "type": "module",
+  "scripts": {
+    "test": "jest --watch"
+  },
+  "author": "Thomas Faller",
+  "license": "MIT",
+  "dependencies": {
+    "@types/react": "^19.1.8",
+    "react": "^19.1.0"
+  },
+  "devDependencies": {
+    "@testing-library/dom": "^10.4.0",
+    "@testing-library/jest-dom": "^6.6.3",
+    "@testing-library/react": "^16.3.0",
+    "@types/jest": "^30.0.0",
+    "jest": "^30.0.4",
+    "jest-environment-jsdom": "^30.0.4",
+    "ts-jest": "^29.4.0",
+    "ts-node": "^10.9.2"
+  }
+}
