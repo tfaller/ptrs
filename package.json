@@ -14,8 +14,9 @@
     "dist"
   ],
   "scripts": {
+    "build": "npm run type-check && tsup",
     "test": "jest --watch",
-    "build": "tsup"
+    "type-check": "tsc --noEmit"
   },
   "author": "Thomas Faller",
   "license": "MIT",
