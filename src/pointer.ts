@@ -11,7 +11,7 @@ import { subscribers } from "./subscriber";
  * ```
  */
 export type Pointer<T> =
-    (T extends object ? (PointerFunc<T> & ObjectPointer<Required<T>>) : PointerFunc<T>)
+    (T extends object ? (PointerFunc<T> & ComplexPointer<Required<T>>) : PointerFunc<T>)
     & NeverFunctionProp<T>
 
 /**
@@ -21,6 +21,13 @@ type PointerFunc<T> = {
     (): T;
     (value: T): void;
 }
+
+type ComplexPointer<T extends object> =
+    T extends Array<any> ? ArrayPointer<T> : ObjectPointer<T>;
+
+type ArrayPointer<T> = T extends Array<infer I> ? {
+    readonly [P in number]: Pointer<I>;
+} & Omit<T, number> : never
 
 type ObjectPointer<T extends object> = {
     [P in keyof T]: Pointer<T[P]>;
@@ -47,13 +54,43 @@ let bubbleUp = true;
  * @param value The initial value of the pointer.
  * @param setter A function that will be called when the pointer is set.
  */
-export const createPointer = <T>(value: T, setter?: (newData: T) => void): Pointer<T> => {
+export const createPointer = <T>(value: T, setter?: (newData: T) => void): Pointer<T> =>
+    createInternalPointer(value, setter)
+
+const createInternalPointer = <T>(
+    value: T,
+    setter?: (newData: T) => void,
+    thisPtr?: Pointer<any>,
+    name?: string | symbol) => {
+
     // when we are an object, we store here our proxied properties
     const proxyProps: Record<PropertyKey, WeakRef<Pointer<any>>> = {}
+
+    let thisIsArray = Array.isArray(thisPtr?.())
 
     const self = new Proxy(() => value, {
 
         apply(target, thisArg, argArray) {
+
+            if (thisIsArray && bubbleUp && Object.hasOwn(Array.prototype, name!)) {
+                // Special array handling.
+                // Array props can't be set or get, like any other normal property
+                // However, they can be used normally.
+                // Note: Only when bubbleUp, because that means, that a user called this function.
+
+                if (name! in ARRAY_MUTATING) {
+
+                    const arr = [...(thisPtr as Pointer<any[]>)()]
+                    const result = arr[name as keyof typeof arr](...argArray)
+                    thisPtr!(arr)
+
+                    return result
+                }
+
+                // non mutating array method
+                const arr = thisPtr!() as any[];
+                return arr[name as keyof typeof arr](...argArray);
+            }
 
             // called when the pointer value should be changed or read
 
@@ -66,6 +103,9 @@ export const createPointer = <T>(value: T, setter?: (newData: T) => void): Point
 
             } else if (argArray.length === 1) {
                 const newValue = argArray[0];
+
+                // parent could have changed, recheck this
+                thisIsArray = Array.isArray(thisPtr?.());
 
                 if (newValue === value)
                     return;
@@ -94,20 +134,67 @@ export const createPointer = <T>(value: T, setter?: (newData: T) => void): Point
 
         get(target, prop) {
 
+            if (prop === "length" && Array.isArray(value)) {
+                // We allow array access basically like a normal array.
+                // Which means length is not a pointer value, but an actual value.
+                // A pointer to length would be kind of strange.
+                // If someone wants to subscribe to length changes, they can use the array pointer itself.
+                return value.length;
+            }
+
             let p = proxyProps[prop]?.deref()
 
             if (!p) {
                 const propValue = value?.[prop as keyof typeof value]
 
-                proxyProps[prop] = new WeakRef(p = createPointer(propValue, (newValue) => {
-                    value = { ...value, [prop]: newValue }
+                proxyProps[prop] = new WeakRef(p = createInternalPointer(propValue, (newValue) => {
+
+                    if (Array.isArray(value)) {
+                        value = [...value] as T
+                        value[prop as keyof typeof value] = newValue as typeof value[keyof typeof value];
+                    } else {
+                        value = { ...value, [prop]: newValue }
+                    }
+
                     setter?.(value)
-                }))
+
+                }, self, prop))
             }
 
             return p
-        }
-    })
+        },
 
-    return self as Pointer<T>;
+        set(target, prop, propValue): boolean {
+
+            if (prop === "length" && Array.isArray(value)) {
+                // special length handling, like in the "get" for arrays
+                const arr = [...value]
+                arr.length = propValue;
+                self(arr as T);
+                return true;
+            }
+
+            // we don't allow any change besides special cases
+            return false;
+        }
+
+    }) as Pointer<T>
+
+    return self;
 }
+
+/**
+ * Array mutating methods that will change the array in place.
+ * A pointer will update its value to the new array.
+ */
+const ARRAY_MUTATING = {
+    'push': true,
+    'pop': true,
+    'unshift': true,
+    'shift': true,
+    'splice': true,
+    'fill': true,
+    'copyWithin': true,
+    'reverse': true,
+    'sort': true
+};
