@@ -50,6 +50,7 @@ let bubbleUp = true;
  * The setter is called when the pointer is set to a new value, so an external state, like
  * a variable or useState, can be updated. However, that external state should not update its value anymore.
  * Updates must be done through the pointer itself, otherwise the pointer won't see the changes.
+ * To enforce this the value will be frozen.
  * 
  * @param value The initial value of the pointer.
  * @param setter A function that will be called when the pointer is set.
@@ -62,6 +63,11 @@ const createInternalPointer = <T>(
     setter?: (newData: T) => void,
     thisPtr?: Pointer<any>,
     name?: string | symbol) => {
+
+    // Prevent any changes, the pointer will handle changes itself.
+    // We don't perform a deep freeze, because that would be too expensive.
+    // If a prop will be accessed by pointer, it will be frozen later anyway.
+    Object.freeze(value);
 
     // when we are an object, we store here our proxied properties
     const proxyProps: Record<PropertyKey, WeakRef<Pointer<any>>> = {}
@@ -110,7 +116,7 @@ const createInternalPointer = <T>(
                 if (newValue === value)
                     return;
 
-                value = newValue;
+                value = Object.freeze(newValue);
                 bubbleUp && setter?.(value)
 
                 subscribers.get(self)?.forEach(sub => {
@@ -156,6 +162,7 @@ const createInternalPointer = <T>(
                         value = { ...value, [prop]: newValue }
                     }
 
+                    Object.freeze(value);
                     setter?.(value)
 
                 }, self, prop))

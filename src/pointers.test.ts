@@ -187,3 +187,27 @@ test("array join", () => {
     expect(p()).toBe(base);
     expect(result).toBe("Hello World");
 })
+
+test("frozen pointer value", () => {
+    const base: Record<string, string> = {
+        "name": "Thomas"
+    }
+    const p = createPointer(base);
+
+    expect(() => {
+        p().name = "Lisa";
+    }).toThrow("Cannot assign to read only property 'name' of object '#<Object>'");
+
+    // base got also frozen
+    expect(() => {
+        base["key"] = "value";
+    }).toThrow("Cannot add property key, object is not extensible");
+
+    // pointer still works
+    p({ "name": "Lisa" })
+    expect(p().name).toBe("Lisa");
+
+    expect(() => {
+        p().name = "Thomas";
+    }).toThrow("Cannot assign to read only property 'name' of object '#<Object>'");
+})
