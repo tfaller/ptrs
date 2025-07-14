@@ -8,6 +8,7 @@
  */
 export const mutate = <T extends object>(value: T, action: (value: T) => void) => {
     const proxies = new Map<object, ReturnType<typeof Proxy.revocable>>();
+    const proxyTarget = new Map<object, object>();
 
     const prepareObject = (value: object) => {
         // Freeze so that no accidental mutation happens
@@ -19,6 +20,9 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
         // Cache for both values
         proxies.set(value, prx);
         proxies.set(newValue, prx);
+
+        // For assignments we later need the actual value
+        proxyTarget.set(prx.proxy, newValue);
 
         return [prx.proxy, newValue];
     }
@@ -48,6 +52,16 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
 
             return proxy;
         },
+
+        set(target, prop, value) {
+
+            if (proxyTarget.has(value)) {
+                // The actual value, not the proxy
+                value = proxyTarget.get(value)!;
+            }
+
+            return Reflect.set(target, prop, value);
+        }
     }
 
     const [proxy, newValue] = prepareObject(value);

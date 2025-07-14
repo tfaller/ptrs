@@ -23,3 +23,15 @@ test("mutate nested object", () => {
     expect(base.metadata).not.toBe(result.metadata);
     expect(result).toStrictEqual({ project: "ptrs", metadata: { version: 2 } });
 })
+
+test("mutate assign proxied object", () => {
+    const base = { project: "ptrs", metadata: { version: 1 } };
+
+    const result = mutate(base, (value) => {
+        value.metadata = value.metadata
+    })
+
+    expect(base).not.toBe(result);
+    expect(base.metadata).not.toBe(result.metadata);
+    expect(result.metadata).toStrictEqual({ version: 1 });
+})
