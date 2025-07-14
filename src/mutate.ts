@@ -1,7 +1,7 @@
 /**
  * Safely mutate an object with an action function.
  * It is possible that more objects are created than necessary.
- * All input and output values will be frozen.
+ * Newly created objects are frozen, but not assigned objects.
  * @param value Value to mutate
  * @param action Mutation action
  * @returns New mutated value
@@ -10,9 +10,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
     const proxies = new Map<object, ReturnType<typeof Proxy.revocable>>();
     const proxyTarget = new Map<object, object>();
 
-    const prepareObject = (value: object) => {
-        // Freeze so that no accidental mutation happens
-        Object.freeze(value);
+    const proxyClone = (value: object) => {
 
         const newValue = Array.isArray(value) ? [...value] : { ...value };
         const prx = Proxy.revocable(newValue, handler);
@@ -45,7 +43,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
                 return proxies.get(value)!.proxy;
             }
 
-            const [proxy, newValue] = prepareObject(value);
+            const [proxy, newValue] = proxyClone(value);
 
             // Use new value from now on
             target[prop] = newValue;
@@ -54,6 +52,11 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
         },
 
         set(target, prop, value) {
+
+            if (proxies.has(value)) {
+                // Make sure we use latest version of the value
+                value = proxies.get(value)!.proxy;
+            }
 
             if (proxyTarget.has(value)) {
                 // The actual value, not the proxy
@@ -64,7 +67,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
         }
     }
 
-    const [proxy, newValue] = prepareObject(value);
+    const [proxy, newValue] = proxyClone(value);
 
     action(proxy);
 
@@ -74,7 +77,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
     }
 
     // Freeze all objects, mutation is done
-    for (const obj of proxies.keys()) {
+    for (const obj of proxyTarget.values()) {
         Object.freeze(obj);
     }
 
