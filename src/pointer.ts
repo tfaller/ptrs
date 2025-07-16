@@ -1,3 +1,4 @@
+import { mutate } from "./mutate";
 import { usedPointers, watchUsedPointers } from "./ptrs";
 import { subscribers } from "./subscriber";
 
@@ -30,7 +31,7 @@ type ArrayPointer<T> = T extends Array<infer I> ? {
 } & Omit<T, number> : never
 
 type ObjectPointer<T extends object> = {
-    [P in keyof T]: Pointer<T[P]>;
+    [P in keyof T]: T[P] extends Function ? T[P] : Pointer<T[P]>;
 }
 
 /**
@@ -98,6 +99,23 @@ const createInternalPointer = <T>(
                 return arr[name as keyof typeof arr](...argArray);
             }
 
+            if (typeof value === "function") {
+                // We allow function calls. That function could mutate the pointer value, 
+                // so that we have to run it as a mutate action.
+                let returnvalue = undefined
+
+                // Allow the function to mutate "this", which is the pointer value.
+                const newThis = mutate(thisPtr!(), (newThis) => {
+                    returnvalue = (value as Function).apply(newThis, argArray)
+                })
+
+                bubbleUp = false
+                thisPtr!(newThis)
+                bubbleUp = true
+
+                return returnvalue;
+            }
+
             // called when the pointer value should be changed or read
 
             if (argArray.length === 0) {
@@ -128,7 +146,9 @@ const createInternalPointer = <T>(
                 bubbleUp = false;
 
                 for (const prop in proxyProps) {
-                    proxyProps[prop].deref()?.(value?.[prop as keyof typeof value]);
+                    if (typeof value?.[prop as keyof typeof value] !== "function") {
+                        proxyProps[prop].deref()?.(value?.[prop as keyof typeof value]);
+                    }
                 }
 
                 bubbleUp = prevBubbleUp;

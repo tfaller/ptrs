@@ -211,3 +211,20 @@ test("frozen pointer value", () => {
         p().name = "Thomas";
     }).toThrow("Cannot assign to read only property 'name' of object '#<Object>'");
 })
+
+test("mutating pointer method", () => {
+    const base = {
+        amount: 1,
+
+        increment(amount: number) {
+            return this.amount += amount;
+        }
+    }
+
+    const p = createPointer(base);
+    const result = p.increment(2)
+
+    expect(result).toBe(3);
+    expect(base.amount).toBe(1);
+    expect(p().amount).toBe(3);
+})
