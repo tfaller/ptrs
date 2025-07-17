@@ -241,3 +241,25 @@ test("pointerSchema changes method to pointer", () => {
 
     expect(result).toEqual(arrowFunc);
 })
+
+test("pointerSchema changes method to readonly", () => {
+    const base = pointerSchema({
+        amount: 1,
+
+        increment(amount: number) {
+            return this.amount += amount;
+        },
+
+        current() {
+            return this.amount;
+        }
+    }, { increment: "readonly", current: "readonly" })
+
+    const p = createPointer(base);
+
+    expect(p.amount()).toEqual(1);
+
+    expect(() => {
+        p.increment(1);
+    }).toThrow("Cannot assign to read only property 'amount' of object '#<Object>'");
+})

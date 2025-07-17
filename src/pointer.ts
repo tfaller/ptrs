@@ -26,11 +26,19 @@ export type PointerPropertyTypePointer = "pointer"
 export type PointerPropertyTypeMutate = "mutate"
 
 /**
+ * The pointer is a function that computes values without changing the pointer.
+ * This can be used as a performance optimization, because "mutate", the default 
+ * function behavior, has an overhead of creating new pointer values.
+ */
+export type PointerPropertyTypeReadonly = "readonly"
+
+/**
  * All possible pointer property types.
  */
 export type PointerPropertyType
     = PointerPropertyTypePointer
     | PointerPropertyTypeMutate
+    | PointerPropertyTypeReadonly
 
 const PointerProperties: unique symbol = Symbol("PointerProperties");
 
@@ -123,11 +131,16 @@ const createInternalPointer = <T>(
             }
 
             if (typeof value === "function" && propertyType !== "pointer") {
-                // We allow function calls. That function could mutate the pointer value, 
-                // so that we have to run it as a mutate action.
-                let returnvalue = undefined
+                // We allow "regular" function calls, if the object property is not threated as a pointer.
+                // "this" is the pointer value of our thisPtr, so a call behaves like a normal method call.
+
+                if (propertyType === "readonly") {
+                    // readonly function, no mutate needed. "this" won't change.
+                    return (value as Function).apply(thisPtr!(), argArray)
+                }
 
                 // Allow the function to mutate "this", which is the pointer value.
+                let returnvalue
                 const newThis = mutate(thisPtr!(), (newThis) => {
                     returnvalue = (value as Function).apply(newThis, argArray)
                 })
