@@ -1,4 +1,4 @@
-import { createPointer } from "./pointer";
+import { createPointer, pointerSchema } from "./pointer";
 
 test("array index access", () => {
     const base = [0]
@@ -227,4 +227,17 @@ test("mutating pointer method", () => {
     expect(result).toBe(3);
     expect(base.amount).toBe(1);
     expect(p().amount).toBe(3);
+})
+
+
+test("pointerSchema changes method to pointer", () => {
+    const arrowFunc = (i: number) => i;
+    const base = pointerSchema({
+        arrowFunc
+    }, { arrowFunc: "pointer" })
+
+    const p = createPointer(base);
+    const result = p.arrowFunc()
+
+    expect(result).toEqual(arrowFunc);
 })

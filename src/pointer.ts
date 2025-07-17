@@ -16,6 +16,25 @@ export type Pointer<T> =
     & NeverFunctionProp<T>
 
 /**
+ * The property should be handled like a pointer.
+ */
+export type PointerPropertyTypePointer = "pointer"
+
+/**
+ * The property is a function that mutates the pointer.
+ */
+export type PointerPropertyTypeMutate = "mutate"
+
+/**
+ * All possible pointer property types.
+ */
+export type PointerPropertyType
+    = PointerPropertyTypePointer
+    | PointerPropertyTypeMutate
+
+const PointerProperties: unique symbol = Symbol("PointerProperties");
+
+/**
 * Valid pointer signatures
 */
 type PointerFunc<T> = {
@@ -31,8 +50,11 @@ type ArrayPointer<T> = T extends Array<infer I> ? {
 } & Omit<T, number> : never
 
 type ObjectPointer<T extends object> = {
-    [P in keyof T]: T[P] extends Function ? T[P] : Pointer<T[P]>;
+    [P in keyof T]: T[P] extends Function ? ObjectPointerFunctionProperty<T, P> : Pointer<T[P]>;
 }
+
+type ObjectPointerFunctionProperty<T extends object, P extends keyof T> =
+    T extends { [PointerProperties]: Partial<{ [PP in P]: PointerPropertyTypePointer }> } ? Pointer<T[P]> : T[P];
 
 /**
  * We can't hide function properties, otherwise the pointer would not be callable.
@@ -74,6 +96,7 @@ const createInternalPointer = <T>(
     const proxyProps: Record<PropertyKey, WeakRef<Pointer<any>>> = {}
 
     let thisIsArray = Array.isArray(thisPtr?.())
+    let propertyType = getPropertyType(thisPtr, name, value);
 
     const self = new Proxy(() => value, {
 
@@ -99,7 +122,7 @@ const createInternalPointer = <T>(
                 return arr[name as keyof typeof arr](...argArray);
             }
 
-            if (typeof value === "function") {
+            if (typeof value === "function" && propertyType !== "pointer") {
                 // We allow function calls. That function could mutate the pointer value, 
                 // so that we have to run it as a mutate action.
                 let returnvalue = undefined
@@ -135,6 +158,7 @@ const createInternalPointer = <T>(
                     return;
 
                 value = Object.freeze(newValue);
+                propertyType = getPropertyType(thisPtr, name, value);
                 bubbleUp && setter?.(value)
 
                 subscribers.get(self)?.forEach(sub => {
@@ -182,6 +206,7 @@ const createInternalPointer = <T>(
                         value = { ...value, [prop]: newValue }
                     }
 
+                    propertyType = getPropertyType(thisPtr, name, value);
                     Object.freeze(value);
                     setter?.(value)
 
@@ -210,6 +235,23 @@ const createInternalPointer = <T>(
     return self;
 }
 
+const getPropertyType = (
+    thisPtr: Pointer<any> | undefined,
+    propName: PropertyKey | undefined,
+    propValue: any): PointerPropertyType => {
+
+    if (thisPtr && propName) {
+        const t = thisPtr()
+        const pointerProps = t?.[PointerProperties]
+
+        if (pointerProps && propName in pointerProps) {
+            return pointerProps[propName];
+        }
+    }
+
+    return typeof propValue === "function" ? "mutate" : "pointer";
+}
+
 /**
  * Array mutating methods that will change the array in place.
  * A pointer will update its value to the new array.
@@ -225,3 +267,20 @@ const ARRAY_MUTATING = {
     'reverse': true,
     'sort': true
 };
+
+/**
+ * Adds a schema to a value that defines how a pointer for the given value should behave.
+ * @param objectOrClass 
+ * @param map A map defining the properties. This map will be frozen, so it can't be changed later.
+ * @returns 
+ */
+export const pointerSchema = <
+    T extends object,
+    M extends Partial<Record<keyof T, PointerPropertyType>>,
+    O extends T & { [PointerProperties]: M }>
+    (objectOrClass: T, map: M): O => {
+
+    const withMap = objectOrClass as unknown as O
+    withMap[PointerProperties] = Object.freeze(map)
+    return withMap
+}
