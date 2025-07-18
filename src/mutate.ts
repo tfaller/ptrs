@@ -12,7 +12,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
 
     const proxyClone = (value: object) => {
 
-        const newValue = Array.isArray(value) ? [...value] : { ...value };
+        const newValue = Array.isArray(value) ? [...value] : shallowCloneObject(value);
         const prx = Proxy.revocable(newValue, handler);
 
         // Cache for both values
@@ -35,7 +35,7 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
 
             const value = target[prop as keyof typeof target];
 
-            if (!(value instanceof Object)) {
+            if (typeof value !== "object") {
                 return value;
             }
 
@@ -83,3 +83,15 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
 
     return newValue;
 }
+
+const shallowCloneObject = <T extends object>(value: T): T =>
+    Object.defineProperties({} as T, Object.fromEntries(
+        Object.entries(Object.getOwnPropertyDescriptors(value)).map(entry => {
+            // We want to mutate, so we have to make them writable.
+            // A prop is probably not writable because the original object is frozen.
+            if (entry[1].writable === false) {
+                entry[1].writable = true
+            }
+            return entry
+        })
+    ));

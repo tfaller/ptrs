@@ -35,3 +35,28 @@ test("mutate assign proxied object", () => {
     expect(base.metadata).not.toBe(result.metadata);
     expect(result.metadata).toStrictEqual({ version: 1 });
 })
+
+test("mutate by using a getter", () => {
+    const obj = mutate({
+        next: 1,
+
+        get run() {
+            return this.next++;
+        }
+    }, (obj) => {
+        expect(obj.run).toEqual(1);
+    })
+
+    expect(obj.next).toEqual(2);
+})
+
+test("mutate an array", () => {
+    const base = [1, 2]
+
+    const result = mutate(base, (value) => {
+        value.push(3);
+    })
+
+    expect(base).not.toBe(result);
+    expect(result).toStrictEqual([1, 2, 3]);
+})
