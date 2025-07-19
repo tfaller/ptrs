@@ -60,3 +60,34 @@ test("mutate an array", () => {
     expect(base).not.toBe(result);
     expect(result).toStrictEqual([1, 2, 3]);
 })
+
+test("mutate with a symbol property", () => {
+    const sym1 = Symbol("sym1")
+    const sym2 = Symbol("sym2")
+
+    const result = mutate({
+        [sym1]: "test",
+        [sym2]: ""
+    }, (value) => {
+        value[sym2] = value[sym1];
+    })
+
+    expect(result[sym1]).toEqual("test");
+    expect(result[sym2]).toEqual("test");
+})
+
+test("mutate keeps prototype", () => {
+    class Base {
+        constructor(public name: string) { }
+    }
+
+    const base = new Base("Thomas");
+
+    const result = mutate(base, (value) => {
+        value.name = "Lisa";
+    })
+
+    expect(base).not.toBe(result);
+    expect(result).toBeInstanceOf(Base);
+    expect(result.name).toEqual("Lisa");
+})
