@@ -263,3 +263,49 @@ test("pointerSchema changes method to readonly", () => {
         p.increment(1);
     }).toThrow("Cannot assign to read only property 'amount' of object '#<Object>'");
 })
+
+test("pointerSchema for get-set property", () => {
+    const base = pointerSchema({
+        a: 1,
+
+        get amount() {
+            return this.a;
+        },
+
+        set amount(value: number) {
+            this.a = value;
+        }
+
+    }, { amount: "get-set" })
+
+    const p = createPointer(base);
+
+    expect(p.amount).toEqual(1);
+
+    p.amount = 2;
+    expect(p.amount).toEqual(2);
+})
+
+test("pointerSchema for mutate get property", () => {
+    const base = pointerSchema({
+        a: 1,
+
+        get amount() {
+            return this.a++;
+        },
+
+        get amountError() {
+            return this.a++;
+        },
+
+    }, { amount: "mutate", amountError: "readonly" })
+
+    const p = createPointer(base);
+
+    expect(p.amount).toEqual(1);
+    expect(p.amount).toEqual(2);
+
+    expect(() => {
+        p.amountError;
+    }).toThrow("Cannot assign to read only property 'a' of object '#<Object>'");
+})

@@ -22,6 +22,8 @@ export type PointerPropertyTypePointer = "pointer"
 
 /**
  * The property is a function that mutates the pointer.
+ * Can also be used for get-set properties where also the getter
+ * changes the pointer.
  */
 export type PointerPropertyTypeMutate = "mutate"
 
@@ -29,8 +31,14 @@ export type PointerPropertyTypeMutate = "mutate"
  * The pointer is a function that computes values without changing the pointer.
  * This can be used as a performance optimization, because "mutate", the default 
  * function behavior, has an overhead of creating new pointer values.
+ * Can also be used for properties that just act as a getter.
  */
 export type PointerPropertyTypeReadonly = "readonly"
+
+/**
+ * The property has a readonly get and a mutating set function.
+ */
+export type PointerPropertyTypeGetSet = "get-set"
 
 /**
  * All possible pointer property types.
@@ -39,6 +47,7 @@ export type PointerPropertyType
     = PointerPropertyTypePointer
     | PointerPropertyTypeMutate
     | PointerPropertyTypeReadonly
+    | PointerPropertyTypeGetSet
 
 const PointerProperties: unique symbol = Symbol("PointerProperties");
 
@@ -58,8 +67,11 @@ type ArrayPointer<T> = T extends Array<infer I> ? {
 } & Omit<T, number> : never
 
 type ObjectPointer<T extends object> = {
-    [P in keyof T]: T[P] extends Function ? ObjectPointerFunctionProperty<T, P> : Pointer<T[P]>;
+    [P in keyof T]: T[P] extends Function ? ObjectPointerFunctionProperty<T, P> : ObjectPointerProperty<T, P>;
 }
+
+type ObjectPointerProperty<T extends object, P extends keyof T> =
+    T extends { [PointerProperties]: Partial<{ [PP in P]: Exclude<PointerPropertyType, PointerPropertyTypePointer> }> } ? T[P] : Pointer<T[P]>;
 
 type ObjectPointerFunctionProperty<T extends object, P extends keyof T> =
     T extends { [PointerProperties]: Partial<{ [PP in P]: PointerPropertyTypePointer }> } ? Pointer<T[P]> : T[P];
@@ -197,6 +209,29 @@ const createInternalPointer = <T>(
 
         get(target, prop) {
 
+            const type = getPropertyType(self, prop, undefined)
+
+            if (type !== "pointer") {
+                // Try to handle as normal property
+                let propValue
+
+                if (type === "mutate") {
+                    // A getter that mutates the pointer value.
+                    self(mutate(value!, (newValue: any) => {
+                        propValue = Reflect.get(newValue, prop, newValue);
+                    }))
+                } else {
+                    propValue = value?.[prop as keyof typeof value];
+                }
+
+                // Should it be a function, we can't return the raw value, 
+                // we have to proxy it. It is probably a method that
+                // acts upon the pointer value.
+                if (typeof propValue !== "function") {
+                    return propValue
+                }
+            }
+
             if (prop === "length" && Array.isArray(value)) {
                 // We allow array access basically like a normal array.
                 // Which means length is not a pointer value, but an actual value.
@@ -230,6 +265,14 @@ const createInternalPointer = <T>(
         },
 
         set(target, prop, propValue): boolean {
+
+            if (getPropertyType(self, prop, undefined) !== "pointer") {
+                // property schema allows to set the property
+                self(mutate(value!, (newValue) => {
+                    Reflect.set(newValue, prop, propValue, newValue);
+                }))
+                return true;
+            }
 
             if (prop === "length" && Array.isArray(value)) {
                 // special length handling, like in the "get" for arrays
