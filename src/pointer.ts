@@ -89,6 +89,62 @@ type NeverFunctionProp<T> = {
 let bubbleUp = true;
 
 /**
+ * Whether the initialization has been done.
+ */
+let initialized = false;
+
+/**
+ * Performs one-time initialization.
+ */
+const initialize = () => {
+    initialized = true;
+
+    // Arrays should work as expected, so we add a pointer schema to the array prototype.
+
+    const arrayReadonly = [
+        "at",
+        "concat",
+        "entries",
+        "every",
+        "filter",
+        "find",
+        "findIndex",
+        "findLast",
+        "findLastIndex",
+        "flat",
+        "flatMap",
+        "forEach",
+        "includes",
+        "indexOf",
+        "join",
+        "keys",
+        "lastIndexOf",
+        "map",
+        "reduce",
+        "reduceRight",
+        "slice",
+        "some",
+        "toLocaleString",
+        "toString",
+        "valueOf",
+        "values",
+        "with"
+    ]
+
+    Object.defineProperty(Array.prototype, PointerProperties, {
+        configurable: false,
+        enumerable: false,
+        writable: false,
+        value: Object.freeze({
+            ...Object.fromEntries(Object.getOwnPropertyNames(Array.prototype).map(name => [
+                name, arrayReadonly.includes(name) ? "readonly" : "mutate"
+            ])),
+            "length": "get-set",
+        })
+    })
+}
+
+/**
  * Creates a pointer for a value. The given value is the initial value of the pointer.
  * The setter is called when the pointer is set to a new value, so an external state, like
  * a variable or useState, can be updated. However, that external state should not update its value anymore.
@@ -98,8 +154,12 @@ let bubbleUp = true;
  * @param value The initial value of the pointer.
  * @param setter A function that will be called when the pointer is set.
  */
-export const createPointer = <T>(value: T, setter?: (newData: T) => void): Pointer<T> =>
-    createInternalPointer(value, setter)
+export const createPointer = <T>(value: T, setter?: (newData: T) => void): Pointer<T> => {
+    if (!initialized) {
+        initialize();
+    }
+    return createInternalPointer(value, setter)
+}
 
 const createInternalPointer = <T>(
     value: T,
@@ -115,32 +175,11 @@ const createInternalPointer = <T>(
     // when we are an object, we store here our proxied properties
     const proxyProps: Record<PropertyKey, WeakRef<Pointer<any>>> = {}
 
-    let thisIsArray = Array.isArray(thisPtr?.())
     let propertyType = getPropertyType(thisPtr, name, value);
 
     const self = new Proxy(() => value, {
 
         apply(target, thisArg, argArray) {
-
-            if (thisIsArray && bubbleUp && Object.hasOwn(Array.prototype, name!)) {
-                // Special array handling.
-                // Array props can't be set or get, like any other normal property
-                // However, they can be used normally.
-                // Note: Only when bubbleUp, because that means, that a user called this function.
-
-                if (name! in ARRAY_MUTATING) {
-
-                    const arr = [...(thisPtr as Pointer<any[]>)()]
-                    const result = arr[name as keyof typeof arr](...argArray)
-                    thisPtr!(arr)
-
-                    return result
-                }
-
-                // non mutating array method
-                const arr = thisPtr!() as any[];
-                return arr[name as keyof typeof arr](...argArray);
-            }
 
             if (typeof value === "function" && propertyType !== "pointer") {
                 // We allow "regular" function calls, if the object property is not threated as a pointer.
@@ -175,9 +214,6 @@ const createInternalPointer = <T>(
 
             } else if (argArray.length === 1) {
                 const newValue = argArray[0];
-
-                // parent could have changed, recheck this
-                thisIsArray = Array.isArray(thisPtr?.());
 
                 if (newValue === value)
                     return;
@@ -232,14 +268,6 @@ const createInternalPointer = <T>(
                 }
             }
 
-            if (prop === "length" && Array.isArray(value)) {
-                // We allow array access basically like a normal array.
-                // Which means length is not a pointer value, but an actual value.
-                // A pointer to length would be kind of strange.
-                // If someone wants to subscribe to length changes, they can use the array pointer itself.
-                return value.length;
-            }
-
             let p = proxyProps[prop]?.deref()
 
             if (!p) {
@@ -274,14 +302,6 @@ const createInternalPointer = <T>(
                 return true;
             }
 
-            if (prop === "length" && Array.isArray(value)) {
-                // special length handling, like in the "get" for arrays
-                const arr = [...value]
-                arr.length = propValue;
-                self(arr as T);
-                return true;
-            }
-
             // we don't allow any change besides special cases
             return false;
         }
@@ -307,22 +327,6 @@ const getPropertyType = (
 
     return typeof propValue === "function" ? "mutate" : "pointer";
 }
-
-/**
- * Array mutating methods that will change the array in place.
- * A pointer will update its value to the new array.
- */
-const ARRAY_MUTATING = {
-    'push': true,
-    'pop': true,
-    'unshift': true,
-    'shift': true,
-    'splice': true,
-    'fill': true,
-    'copyWithin': true,
-    'reverse': true,
-    'sort': true
-};
 
 /**
  * Adds a schema to a value that defines how a pointer for the given value should behave.
