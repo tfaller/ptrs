@@ -16,6 +16,7 @@
   "scripts": {
     "build": "npm run type-check && tsup",
     "test": "jest --watch",
+    "coverage": "jest --coverage",
     "type-check": "tsc --noEmit"
   },
   "author": "Thomas Faller",
