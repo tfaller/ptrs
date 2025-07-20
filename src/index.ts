@@ -1,10 +1,11 @@
 import { useMemoPointer, usePointer, useStatePointer } from "./hooks";
+import { createPointer, pointerSchema, Pointer } from "./pointer";
 import { ptrs } from "./ptrs";
-import { createPointer, Pointer } from "./pointer";
 import { subscribe } from "./subscriber";
 
 export {
     createPointer,
+    pointerSchema,
     ptrs,
     subscribe,
     useMemoPointer,
