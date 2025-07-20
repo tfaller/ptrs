@@ -1,108 +1,128 @@
 /**
  * Safely mutate an object with an action function.
  * It is possible that more objects are created than necessary.
+ * All accessed descendants of the object are cloned. If something referenced
+ * a descendant, it from now on references a potential outdated version.
  * Newly created objects are frozen, but not assigned objects.
  * @param value Value to mutate
  * @param action Mutation action
  * @returns New mutated value
  */
 export const mutate = <T extends object>(value: T, action: (value: T) => void) => {
-    const proxies = new Map<object, ReturnType<typeof Proxy.revocable>>();
-    const proxyTarget = new Map<object, object>();
+    const mutatedObjects = new Map<object, object>();
+    const mappedProps = new Map<object, Set<() => any>>();
 
-    const proxyClone = (value: object) => {
-
-        const newValue = Array.isArray(value) ? [...value] : shallowCloneObject(value);
-        const prx = Proxy.revocable(newValue, handler);
-
-        // Cache for both values
-        proxies.set(value, prx);
-        proxies.set(newValue, prx);
-
-        // For assignments we later need the actual value
-        proxyTarget.set(prx.proxy, newValue);
-
-        return [prx.proxy, newValue];
-    }
+    // If currently the action is running
+    let inAction = false
 
     // Every element that is touched by the action gets recreated.
     // This is a bit wasteful, because many/most elements will not be updated, just read.
     // However, this makes it much simpler.
+    // Also, we don't use proxies, because if a value would be assigned to something
+    // outside of the action, it could never get rid of the proxy.
 
-    const handler: ProxyHandler<any> = {
+    const shallowCloneObject = <T extends object>(value: T): T => {
 
-        get(target, prop) {
+        if (mutatedObjects.has(value)) {
+            return mutatedObjects.get(value)! as T;
+        }
 
-            const value = target[prop as keyof typeof target];
+        const props = Object.getOwnPropertyDescriptors(value)
+        const getters = new Set<() => any>();
 
-            if (typeof value !== "object") {
-                return value;
+        // We can't simply use Object.entries, because that skips symbols.
+
+        proxyGetter(props, Object.getOwnPropertyNames(props), getters);
+        proxyGetter(props, Object.getOwnPropertySymbols(props), getters);
+
+        const isArray = Array.isArray(value);
+
+        if (isArray) {
+            // length is not configurable
+            delete props.length;
+        }
+
+        const obj = isArray
+            ? Object.defineProperties([], props) as T
+            : Object.create(Object.getPrototypeOf(value), props);
+
+        mutatedObjects.set(value, obj);
+        mappedProps.set(obj, getters);
+
+        return obj;
+    }
+
+    const proxyGetter = (
+        descriptors: Record<PropertyKey, PropertyDescriptor>,
+        props: PropertyKey[], getters: Set<() => any>) => {
+
+        // Replace all value props with a getter.
+        // This getter will clone objects on access, so that they can be mutated.
+
+        for (const p of props) {
+            const prop = descriptors[p];
+
+            if (prop.writable !== undefined) {
+                // Whether the action changed the value.
+                let changed = false
+
+                const getter = () => {
+                    const value = prop.value
+
+                    if (inAction && !changed && typeof value === "object") {
+                        changed = true
+                        return prop.value = shallowCloneObject(value)
+                    }
+
+                    return value;
+                }
+
+                descriptors[p] = {
+                    configurable: true,
+                    enumerable: prop.enumerable,
+                    get: getter,
+                    set: (v: any) => (changed = true, prop.value = v),
+                }
+
+                getters.add(getter);
             }
-
-            if (proxies.has(value)) {
-                return proxies.get(value)!.proxy;
-            }
-
-            const [proxy, newValue] = proxyClone(value);
-
-            // Use new value from now on
-            target[prop] = newValue;
-
-            return proxy;
-        },
-
-        set(target, prop, value) {
-
-            if (proxies.has(value)) {
-                // Make sure we use latest version of the value
-                value = proxies.get(value)!.proxy;
-            }
-
-            if (proxyTarget.has(value)) {
-                // The actual value, not the proxy
-                value = proxyTarget.get(value)!;
-            }
-
-            return Reflect.set(target, prop, value);
         }
     }
 
-    const [proxy, newValue] = proxyClone(value);
+    const cloned = shallowCloneObject(value);
 
-    action(proxy);
+    inAction = true;
+    action(cloned);
+    inAction = false;
 
-    // Mutate helper should not be used outside of this function
-    for (const proxy of proxies.values()) {
-        proxy.revoke();
+    // Finalize all objects, mutation is done
+    for (const obj of mutatedObjects.values()) {
+        finalizeMutation(obj, mappedProps.get(obj)!);
     }
 
-    // Freeze all objects, mutation is done
-    for (const obj of proxyTarget.values()) {
-        Object.freeze(obj);
-    }
-
-    return newValue;
+    return cloned;
 }
 
-const shallowCloneObject = <T extends object>(value: T): T => {
+const finalizeMutation = (value: object, getters: Set<() => any>) => {
     const props = Object.getOwnPropertyDescriptors(value)
 
-    // We can't simply use Object.entries, because that skips symbols.
-    // We want to mutate, so we have to make all props writable.
-    // A prop is probably not writable because the original object is frozen.
+    finalizeMutationProp(value, props, Object.getOwnPropertyNames(props), getters);
+    finalizeMutationProp(value, props, Object.getOwnPropertySymbols(props), getters);
 
-    makePropsWriteable(props, Object.getOwnPropertyNames(props));
-    makePropsWriteable(props, Object.getOwnPropertySymbols(props));
-
-    return Object.create(Object.getPrototypeOf(value), props);
+    // Freeze the object, so it can't be mutated anymore.
+    Object.freeze(value);
 }
 
-const makePropsWriteable = (obj: Record<PropertyKey, PropertyDescriptor>, props: PropertyKey[]) => {
-    for (const p of props) {
-        const prop = obj[p];
+const finalizeMutationProp = (
+    obj: object, descriptors: Record<PropertyKey, PropertyDescriptor>,
+    props: PropertyKey[], getters: Set<() => any>) => {
 
-        if (prop.writable === false) {
-            prop.writable = true;
+    for (const p of props) {
+        const prop = descriptors[p];
+
+        if (prop.get && getters.has(prop.get)) {
+            // change to an regular value prop
+            Object.defineProperty(obj, p, { value: prop.get() });
         }
     }
 }
