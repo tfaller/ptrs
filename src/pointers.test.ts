@@ -28,6 +28,18 @@ test("array length", () => {
     expect(p()).toStrictEqual([1, 2, 3]);
 });
 
+test("array iteration", () => {
+    const base = [1, 2, 3]
+    const p = createPointer(base);
+
+    const items: number[] = [];
+    for (const item of p) {
+        items.push(item);
+    }
+
+    expect(items).toStrictEqual(base);
+})
+
 test("sparse array", () => {
     const base: number[] = [];
     const p = createPointer(base);
