@@ -49,6 +49,11 @@ export const mutate = <T extends object>(value: T, action: (value: T) => void) =
         mutatedObjects.set(value, obj);
         mappedProps.set(obj, getters);
 
+        if (isArray) {
+            // Make sure for sparse arrays that the length is correct.
+            obj.length = value.length;
+        }
+
         return obj;
     }
 

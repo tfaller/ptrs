@@ -91,3 +91,17 @@ test("mutate keeps prototype", () => {
     expect(result).toBeInstanceOf(Base);
     expect(result.name).toEqual("Lisa");
 })
+
+test("mutate sparse array", () => {
+    const arr: number[] = []
+    arr.length = 3
+
+    const result = mutate(arr, (arr) => {
+        arr[1] = 1;
+    })
+
+    expect(result).toBeInstanceOf(Array);
+    expect(result.length).toBe(3);
+    expect(result).toStrictEqual([, 1, ,]);
+    expect(result).not.toBe(arr);
+})
