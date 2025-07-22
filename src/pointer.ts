@@ -55,7 +55,7 @@ const PointerProperties: unique symbol = Symbol("PointerProperties");
 * Valid pointer signatures
 */
 type PointerFunc<T> = {
-    (): T;
+    (): UndefinedToOptional<T>;
     (value: T): void;
 }
 
@@ -83,6 +83,28 @@ type ObjectPointerFunctionProperty<T extends object, P extends keyof T> =
 type NeverFunctionProp<T> = {
     [P in Exclude<keyof Function, keyof NonNullable<T>>]: never;
 }
+
+/**
+ * Convert undefined value to optional property.
+ */
+type UndefinedToOptional<T> =
+    T extends object
+    ? (T extends any[]
+        ? UndefinedToOptionalArray<T>
+        : (T extends Function
+            ? T // unchanged function
+            : UndefinedToOptionalObject<T>))
+    : T // primary data type
+
+type UndefinedToOptionalArray<T> =
+    T extends Array<infer I>
+    ? Array<UndefinedToOptional<I>>
+    : T
+
+type UndefinedToOptionalObject<T> =
+    { [K in keyof T as undefined extends T[K] ? never : K]: UndefinedToOptional<T[K]> } &
+    { [K in keyof T as undefined extends T[K] ? K : never]?: UndefinedToOptional<Exclude<T[K], undefined>> }
+
 /**
  * Whether the pointer update should bubble up
  */
@@ -275,12 +297,26 @@ const createInternalPointer = <T>(
 
                 proxyProps[prop] = new WeakRef(p = createInternalPointer(propValue, (newValue) => {
 
-                    if (Array.isArray(value)) {
-                        value = [...value] as T
-                        value[prop as keyof typeof value] = newValue as typeof value[keyof typeof value];
-                    } else {
-                        value = { ...value, [prop]: newValue }
+                    if (value === undefined) {
+                        // "this" is undefined. We will create it.
+                        // There is however an issue: We don't now the "schema".
+                        // We just can assume a plain object or array.
+                        if (typeof prop === "string" && parseInt(prop, 10).toString() === prop) {
+                            value = [] as T;
+                        } else {
+                            value = {} as T;
+                        }
                     }
+
+                    value = mutate(value!, (value) => {
+                        if (newValue === undefined) {
+                            // By convention we delete the property for undefined values.
+                            // A optional property is far more common than a property that is set to undefined.
+                            Reflect.deleteProperty(value, prop);
+                        } else {
+                            Reflect.set(value, prop, newValue, value);
+                        }
+                    })
 
                     propertyType = getPropertyType(thisPtr, name, value);
                     Object.freeze(value);

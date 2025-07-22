@@ -56,7 +56,7 @@ test("sparse array", () => {
 
     expect(base).toStrictEqual([]);
     expect(p1()).toBe(1);
-    expect(p()).toStrictEqual([undefined, 1, undefined]);
+    expect(p()).toStrictEqual([, 1, ,]);
     expect(p()).not.toBe(base);
     expect(p.length).toBe(3);
 })
@@ -198,6 +198,17 @@ test("array join", () => {
     expect(base).toStrictEqual(["Hello", "World"]);
     expect(p()).toBe(base);
     expect(result).toBe("Hello World");
+})
+
+test("optional property", () => {
+    type Item = { name: string, predecessor?: Item }
+    const p = createPointer({ name: "v2", predecessor: { name: "v1" } } as Item);
+
+    expect(p.predecessor.name()).toBe("v1");
+
+    p.predecessor(undefined)
+
+    expect(p()).toStrictEqual({ name: "v2" });
 })
 
 test("frozen pointer value", () => {
