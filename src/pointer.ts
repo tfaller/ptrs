@@ -12,7 +12,7 @@ import { subscribers } from "./subscriber";
  * ```
  */
 export type Pointer<T> =
-    (T extends object ? (PointerFunc<T> & ComplexPointer<Required<T>>) : PointerFunc<T>)
+    (NonNullable<T> extends object ? (PointerFunc<T> & ComplexPointer<NonNullable<T>>) : PointerFunc<T>)
     & NeverFunctionProp<T>
 
 /**
@@ -67,7 +67,7 @@ type ArrayPointer<T> = T extends Array<infer I> ? {
 } & Omit<T, number> : never
 
 type ObjectPointer<T extends object> = {
-    [P in keyof T]: T[P] extends Function ? ObjectPointerFunctionProperty<T, P> : ObjectPointerProperty<T, P>;
+    [P in keyof T]-?: T[P] extends Function ? ObjectPointerFunctionProperty<T, P> : ObjectPointerProperty<T, P>;
 }
 
 type ObjectPointerProperty<T extends object, P extends keyof T> =
@@ -81,7 +81,7 @@ type ObjectPointerFunctionProperty<T extends object, P extends keyof T> =
  * But we can make them never, so that they are not "usable".
  */
 type NeverFunctionProp<T> = {
-    [P in Exclude<keyof Function, keyof T>]: never;
+    [P in Exclude<keyof Function, keyof NonNullable<T>>]: never;
 }
 /**
  * Whether the pointer update should bubble up
