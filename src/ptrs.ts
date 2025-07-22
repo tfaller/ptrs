@@ -19,7 +19,7 @@ export let watchUsedPointers = false;
  * @param component The component to watch
  * @returns A wrapped component that behaves like the original component, but watches for pointer usage.
  */
-export const ptrs = <P extends {}>(component: React.FunctionComponent<P>) => ((props: P) => {
+export const ptrs = <P extends {}>(component: React.FunctionComponent<P>) => ((props: P): ReturnType<typeof component> => {
 
     if (watchUsedPointers) {
         throw new Error("There should never run two ptrs components at the same time. If they do, it breaks general assumptions about the ptrs component.");
