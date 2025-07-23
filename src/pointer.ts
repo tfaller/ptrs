@@ -52,11 +52,16 @@ export type PointerPropertyType
 const PointerProperties: unique symbol = Symbol("PointerProperties");
 
 /**
+ * Makes sure that a type is not a pointer.
+ */
+type NoPointer<T> = T extends Pointer<any> ? never : T;
+
+/**
 * Valid pointer signatures
 */
 type PointerFunc<T> = {
     (): UndefinedToOptional<T>;
-    (value: T): void;
+    <V extends T>(value: NoPointer<V>): void;
 }
 
 type ComplexPointer<T extends object> =
@@ -254,7 +259,7 @@ const createInternalPointer = <T>(
 
                 for (const prop in proxyProps) {
                     if (typeof value?.[prop as keyof typeof value] !== "function") {
-                        proxyProps[prop].deref()?.(value?.[prop as keyof typeof value]);
+                        proxyProps[prop].deref()?.(value?.[prop as keyof typeof value] as NoPointer<any>);
                     }
                 }
 
@@ -277,7 +282,7 @@ const createInternalPointer = <T>(
                     // A getter that mutates the pointer value.
                     self(mutate(value!, (newValue: any) => {
                         propValue = Reflect.get(newValue, prop, newValue);
-                    }))
+                    }) as NoPointer<T>)
                 } else {
                     propValue = value?.[prop as keyof typeof value];
                 }
@@ -334,7 +339,7 @@ const createInternalPointer = <T>(
                 // property schema allows to set the property
                 self(mutate(value!, (newValue) => {
                     Reflect.set(newValue, prop, propValue, newValue);
-                }))
+                }) as NoPointer<T>)
                 return true;
             }
 

@@ -332,3 +332,11 @@ test("pointerSchema for mutate get property", () => {
         p.amountError;
     }).toThrow("Cannot assign to read only property 'a' of object '#<Object>'");
 })
+
+// Typescript typing tests
+
+if (false) {
+    const x = createPointer({ name: "Thomas" });
+    // @ts-expect-error
+    x(x); // not allowed, its a pointer, not a pointer value
+}
