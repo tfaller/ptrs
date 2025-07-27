@@ -6,7 +6,7 @@ type Subscriber = React.Dispatch<React.SetStateAction<number>>;
  * A global state where we store all currently subscribed pointers.
  * There should usually be no memory leaks, because we use WeakMap and WeakRef.
  */
-export const subscribers = new WeakMap<Pointer<any>, WeakRef<Subscriber>[]>()
+const subscribers = new WeakMap<Pointer<any>, WeakRef<Subscriber>[]>()
 
 /**
  * Subscribes to pointer changes.
@@ -67,5 +67,18 @@ export const subscribersRemove = (pointer: Pointer<any>, subscriber: Subscriber)
         subscribers.delete(pointer);
     } else {
         subscribers.set(pointer, newSubs);
+    }
+}
+
+/**
+ * Triggers the subscribers for a given pointer.
+ * @param pointer The pointer to trigger the subscribers for.
+ */
+export const subscriberTrigger = (pointer: Pointer<any>) => {
+    const subs = subscribers.get(pointer)
+    if (!subs) return
+
+    for (const sub of subs) {
+        sub.deref()?.((old: number) => old + 1)
     }
 }

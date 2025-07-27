@@ -63,7 +63,24 @@ test("subscribe to pointer changes", () => {
     expect(called).toBe(3);
 })
 
+test("child updated triggers parent subscribers", () => {
+    const obj = createPointer({ person: { name: "Thomas" } });
 
+    let root = 0;
+    subscribe(() => { root++; }, obj);
+
+    let person = 0;
+    subscribe(() => { person++; }, obj.person);
+
+    let name = 0;
+    subscribe(() => { name++; }, obj.person.name);
+
+    obj.person.name("Lisa");
+
+    expect(root).toBe(1);
+    expect(person).toBe(1);
+    expect(name).toBe(1);
+})
 
 test("set pointer to same value does not trigger subscribers", () => {
     const pointer = createPointer(42);

@@ -1,6 +1,6 @@
 import { mutate } from "./mutate";
 import { usedPointers, watchUsedPointers } from "./ptrs";
-import { subscribers } from "./subscriber";
+import { subscriberTrigger } from "./subscriber";
 
 /**
  * A pointer references to an actual value. A pointer is stable and won't change
@@ -249,9 +249,7 @@ const createInternalPointer = <T>(
                 propertyType = getPropertyType(thisPtr, name, value);
                 bubbleUp && setter?.(value)
 
-                subscribers.get(self)?.forEach(sub => {
-                    sub.deref()?.((old: number) => old + 1)
-                })
+                subscriberTrigger(self);
 
                 // we have to disable bubble up, while updating children
                 const prevBubbleUp = bubbleUp
@@ -326,6 +324,8 @@ const createInternalPointer = <T>(
                     propertyType = getPropertyType(thisPtr, name, value);
                     Object.freeze(value);
                     setter?.(value)
+
+                    subscriberTrigger(self);
 
                 }, self, prop))
             }
