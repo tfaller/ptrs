@@ -1,6 +1,6 @@
 {
   "name": "ptrs",
-  "version": "0.0.2",
+  "version": "0.0.3",
   "description": "Manage your state with pointers.",
   "keywords": [
     "react",
