@@ -1,5 +1,5 @@
 import { useMemoPointer, usePointer, useStatePointer } from "./hooks";
-import { createPointer, pointerSchema, Pointer } from "./pointer";
+import { createPointer, pointerSchema, NoPointer, Pointer, PointerValue } from "./pointer";
 import { ptrs } from "./ptrs";
 import { subscribe } from "./subscriber";
 
@@ -14,5 +14,7 @@ export {
 }
 
 export type {
-    Pointer
+    NoPointer,
+    Pointer,
+    PointerValue,
 }

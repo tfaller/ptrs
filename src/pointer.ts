@@ -16,6 +16,16 @@ export type Pointer<T> =
     & NeverFunctionProp<T>
 
 /**
+ * Defines a valid pointer value.
+ */
+export type PointerValue<T> = T extends UndefinedToOptional<T> ? T : UndefinedToOptional<T>;
+
+/**
+ * Makes sure that a type is not a pointer.
+ */
+export type NoPointer<T> = T extends Pointer<any> ? never : T;
+
+/**
  * The property should be handled like a pointer.
  */
 export type PointerPropertyTypePointer = "pointer"
@@ -52,15 +62,10 @@ export type PointerPropertyType
 const PointerProperties: unique symbol = Symbol("PointerProperties");
 
 /**
- * Makes sure that a type is not a pointer.
- */
-type NoPointer<T> = T extends Pointer<any> ? never : T;
-
-/**
 * Valid pointer signatures
 */
 type PointerFunc<T> = {
-    (): UndefinedToOptional<T>;
+    (): T;
     <V extends T>(value: NoPointer<V>): void;
 }
 
@@ -181,7 +186,7 @@ const initialize = () => {
  * @param value The initial value of the pointer.
  * @param setter A function that will be called when the pointer is set.
  */
-export const createPointer = <T>(value: T, setter?: (newData: T) => void): Pointer<T> => {
+export const createPointer = <T>(value: PointerValue<T>, setter?: (newData: typeof value) => void): Pointer<typeof value> => {
     if (!initialized) {
         initialize();
     }

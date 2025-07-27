@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { createPointer, Pointer } from "./pointer";
+import { createPointer, NoPointer, Pointer, PointerValue } from "./pointer";
 import { subscribersAdd, subscribersRemove } from "./subscriber";
 import { usedPointers, watchUsedPointers } from "./ptrs";
 
@@ -8,7 +8,7 @@ import { usedPointers, watchUsedPointers } from "./ptrs";
  * @param initialValue The initial value of the pointer/state.
  * @param usePointerHook If true, the pointer will be registered with the usePointer hook.
  */
-export const useStatePointer = <T>(initialValue: T, usePointerHook = true): Pointer<T> => {
+export const useStatePointer = <T>(initialValue: PointerValue<T>, usePointerHook = true) => {
     const ptr = useMemo(() => createPointer(initialValue), []);
 
     if (usePointerHook) {
@@ -31,9 +31,9 @@ export const useStatePointer = <T>(initialValue: T, usePointerHook = true): Poin
  * @param value The value which the pointer holds.
  * @param usePointerHook If true, the pointer will be registered with the usePointer hook.
  */
-export const useMemoPointer = <T>(value: T, usePointerHook = true): Pointer<T> => {
+export const useMemoPointer = <T>(value: PointerValue<T>, usePointerHook = true) => {
     const ptr = useStatePointer(value, usePointerHook);
-    useEffect(() => { ptr(value) }, [ptr, value]);
+    useEffect(() => { ptr(value as NoPointer<typeof value>) }, [ptr, value]);
     return ptr;
 }
 
