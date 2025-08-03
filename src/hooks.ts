@@ -86,14 +86,12 @@ export const usePointer = (...pointers: Pointer<any>[]) => {
         }
     }
 
-    useEffect(() => (() => {
-        // component won't be used anymore, clean up subscribers
-        const pm = pointerMap.current!;
-        for (const p of pm.keys()) {
-            subscribersRemove(p, subscriber);
-        }
-        pm.clear();
-    }), [])
+    // In ptrs version 0.0.3 and earlier, useEffect was used
+    // here to unsubscribe on unmount. However, this is unnecessary.
+    // Subscribers are implemented as WeakRefs, they "unsubscribe" automatically
+    // as soon as react cleanups the component state. In the meantime
+    // react could get dispatched by an old subscriber, but react ignores it.
+    // As a result, it is more efficient and simpler.
 }
 
 const usePointerReducer = (state: number) => state + 1
