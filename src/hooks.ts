@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef } from "react";
 import { createPointer, NoPointer, Pointer, PointerValue } from "./pointer";
 import { subscribersAdd, subscribersRemove } from "./subscriber";
 import { usedPointers, watchUsedPointers } from "./ptrs";
@@ -58,7 +58,7 @@ export const usePointer = (...pointers: Pointer<any>[]) => {
         return;
     }
 
-    const [, subscriber] = useState(0)
+    const [, subscriber] = useReducer(usePointerReducer, 0)
     const pointerMap = useRef<VersionPointerMap>(null);
 
     const pm = pointerMap.current ?? (pointerMap.current = new Map() as VersionPointerMap);
@@ -95,3 +95,5 @@ export const usePointer = (...pointers: Pointer<any>[]) => {
         pm.clear();
     }), [])
 }
+
+const usePointerReducer = (state: number) => state + 1

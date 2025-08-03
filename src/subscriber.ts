@@ -1,6 +1,6 @@
 import { Pointer } from './pointer';
 
-type Subscriber = React.Dispatch<React.SetStateAction<number>>;
+type Subscriber = () => void
 
 /**
  * A global state where we store all currently subscribed pointers.
@@ -79,6 +79,6 @@ export const subscriberTrigger = (pointer: Pointer<any>) => {
     if (!subs) return
 
     for (const sub of subs) {
-        sub.deref()?.((old: number) => old + 1)
+        sub.deref()?.()
     }
 }
